@@ -1,0 +1,34 @@
+# Core
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+sqlalchemy>=2.0.0
+networkx>=3.0.0
+redis>=5.0.0
+
+# ML
+scikit-learn>=1.5.0
+xgboost>=2.1.0
+pandas>=2.2.0
+numpy>=1.26.0
+joblib>=1.4.0
+
+# RAG
+sentence-transformers>=3.0.0
+chromadb>=0.5.0
+google-genai>=2.3.0
+
+# Data generation
+faker>=28.0.0
+
+# Visualization (notebooks/training only)
+matplotlib>=3.9.0
+seaborn>=0.13.0
+
+# Testing
+pytest>=8.3.0
+httpx>=0.27.0
+
+# Logging
+structlog>=24.4.0

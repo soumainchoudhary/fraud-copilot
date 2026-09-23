@@ -1,0 +1,65 @@
+# Dependencies & Virtual Environments
+.venv/
+env/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Environment & Secrets (NEVER COMMIT)
+.env
+.env.*
+!.env.example
+*.env
+
+# Large raw datasets & local vector store databases
+data/raw/*
+!data/raw/.gitkeep
+data/chroma_db/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Linter & Tool Caches
+.ruff_cache/
+
+# ML Model binary artifacts (generated via python -m app.scoring.train)
+models/*.joblib
+models/*.pkl
+!models/.gitkeep
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Pytest, coverage & testing caches
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Temporary files & logs
+*.tmp
+*.log
+*.bak

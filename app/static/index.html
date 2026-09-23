@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fraud Investigation Copilot | Real-time Scoring & RAG Assistant</title>
+  <meta name="description" content="Production-ready real-time transaction fraud scoring with XGBoost and grounded natural language case investigation with Gemini & ChromaDB." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- Ambient background glow -->
+  <div class="glow-sphere glow-1"></div>
+  <div class="glow-sphere glow-2"></div>
+  <div class="glow-sphere glow-3"></div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <div class="brand-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Fraud Copilot</h1>
+          <span class="brand-subtitle">AI Scoring Engine &amp; Investigation Assistant</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" id="tab-scoring-btn" onclick="switchTab('scoring')" role="tab" aria-selected="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Risk Scoring
+        </button>
+        <button class="nav-tab" id="tab-copilot-btn" onclick="switchTab('copilot')" role="tab" aria-selected="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Investigation Copilot
+        </button>
+        <button class="nav-tab" id="tab-cases-btn" onclick="switchTab('cases')" role="tab" aria-selected="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Case Explorer
+        </button>
+      </nav>
+
+      <!-- System Status Pills -->
+      <div class="system-status">
+        <span id="system-clock" class="mono text-muted" style="font-size: 0.8rem; padding: 5px 10px; background: #ffffff; border-radius: 6px; border: 1px solid #cbd5e1; box-shadow: var(--shadow-sm);">--:--:-- UTC</span>
+        <button class="btn btn-secondary btn-sm" onclick="openBatchModal()" id="btn-open-batch" title="Launch Batch Scoring Simulator" style="border-radius: 9999px; padding: 5px 14px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <span>Batch Simulator</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="promptApiKey()" id="api-key-btn" title="Configure X-API-Key header" style="border-radius: 9999px; padding: 5px 14px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; border-color: #cbd5e1; background: #ffffff; color: #334155;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span id="api-key-label">API Key: Dev</span>
+        </button>
+        <div class="status-pill" id="ml-status-pill">
+          <span class="pulse-dot green"></span>
+          <span class="status-label">ML Model Active</span>
+        </div>
+        <div class="status-pill" id="rag-status-pill">
+          <span class="pulse-dot cyan"></span>
+          <span class="status-label" id="cases-count-label">ChromaDB Connected</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Stream Ticker -->
+  <div class="live-stream-ticker glass" id="live-stream-ticker-bar">
+    <div class="ticker-badge">
+      <span class="pulse-dot green" id="ws-pulse-dot"></span>
+      <span id="ws-status-text">WS LIVE STREAM</span>
+    </div>
+    <div class="ticker-feed-container" id="ticker-feed">
+      <div class="ticker-pill low">
+        <span>⚡ Connected to real-time transaction event stream (/ws/live-transactions)</span>
+      </div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="triggerSimulatedStream()" id="btn-stream-sim" style="border-radius: 9999px; padding: 4px 12px; font-size: 0.75rem; white-space: nowrap; border-color: #fde68a; background: #fffbeb; color: #b45309;">
+      ⚡ Simulate Stream Burst
+    </button>
+  </div>
+
+  <!-- Metrics Ribbon -->
+  <section class="metrics-ribbon" aria-label="System Metrics">
+    <div class="metric-card">
+      <div class="metric-icon purple">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div>
+        <div class="metric-value" id="stat-total-cases">200</div>
+        <div class="metric-title">Total Flagged Cases</div>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon red">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div>
+        <div class="metric-value" id="stat-escalated-cases">--</div>
+        <div class="metric-title">Escalated (L2 Review)</div>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon amber">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div>
+        <div class="metric-value" id="stat-under-review">--</div>
+        <div class="metric-title">Under Review</div>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon green">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div>
+        <div class="metric-value" id="stat-resolved-cases">--</div>
+        <div class="metric-title">Resolved / Closed</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main App Container -->
+  <main class="app-main">
+
+    <!-- TAB 1: RISK SCORING SIMULATOR -->
+    <section class="tab-pane active" id="pane-scoring" role="tabpanel">
+      <div class="pane-grid">
+        <!-- Left: Transaction Input & Presets -->
+        <div class="panel glass">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">Transaction Simulator</h2>
+              <p class="panel-subtitle">Test real-time fraud probability scoring and inspect XAI feature attribution</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="randomizeFeatures()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              Randomize
+            </button>
+          </div>
+
+          <!-- Scenario Presets -->
+          <div class="presets-section">
+            <span class="presets-label">Quick Scenarios:</span>
+            <div class="presets-grid">
+              <button class="preset-btn" onclick="applyPreset('legit')">
+                <span class="preset-dot green"></span>
+                <span>Normal Purchase (€24.50)</span>
+              </button>
+              <button class="preset-btn" onclick="applyPreset('fraud_heavy')">
+                <span class="preset-dot red"></span>
+                <span>Extreme Anomaly (€550.00)</span>
+              </button>
+              <button class="preset-btn" onclick="applyPreset('structuring')">
+                <span class="preset-dot amber"></span>
+                <span>Structuring / Night (€149.99)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Transaction Form -->
+          <form id="score-form" onsubmit="handleScoreSubmit(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="txn-id">Transaction ID</label>
+                <input type="text" id="txn-id" required value="TXN-SIM-7842" />
+              </div>
+              <div class="form-group">
+                <label for="txn-amount">Amount (€)</label>
+                <input type="number" id="txn-amount" step="0.01" required value="149.99" />
+              </div>
+              <div class="form-group">
+                <label for="txn-time">Time (Seconds elapsed)</label>
+                <input type="number" id="txn-time" step="1" required value="43200" />
+              </div>
+            </div>
+
+            <!-- Key PCA Dimensions Highlight -->
+            <div class="feature-sliders-group">
+              <div class="group-header">
+                <span class="group-title">Key Latent Fraud Signatures (PCA)</span>
+                <span class="group-caption">Values typically range from -10 to +10</span>
+              </div>
+              <div class="sliders-grid">
+                <div class="slider-box">
+                  <div class="slider-label">
+                    <span>V14 (Primary Compromise)</span>
+                    <span class="slider-val" id="val-v14">-0.14</span>
+                  </div>
+                  <input type="range" id="slider-v14" min="-10" max="10" step="0.1" value="-0.14" oninput="updateSlider('v14')" />
+                </div>
+                <div class="slider-box">
+                  <div class="slider-label">
+                    <span>V12 (Device Signature)</span>
+                    <span class="slider-val" id="val-v12">1.07</span>
+                  </div>
+                  <input type="range" id="slider-v12" min="-10" max="10" step="0.1" value="1.07" oninput="updateSlider('v12')" />
+                </div>
+                <div class="slider-box">
+                  <div class="slider-label">
+                    <span>V10 (Auth Profile)</span>
+                    <span class="slider-val" id="val-v10">-0.17</span>
+                  </div>
+                  <input type="range" id="slider-v10" min="-10" max="10" step="0.1" value="-0.17" oninput="updateSlider('v10')" />
+                </div>
+                <div class="slider-box">
+                  <div class="slider-label">
+                    <span>V4 (Merchant Risk)</span>
+                    <span class="slider-val" id="val-v4">1.38</span>
+                  </div>
+                  <input type="range" id="slider-v4" min="-10" max="10" step="0.1" value="1.38" oninput="updateSlider('v4')" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Expandable PCA features container -->
+            <details class="pca-details">
+              <summary>View & Customize Remaining PCA Features (V1–V28)</summary>
+              <div class="pca-inputs-grid" id="pca-grid">
+                <!-- Dynamically generated inputs -->
+              </div>
+            </details>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="score-submit-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                Score Transaction
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Right: Score Gauge & XAI Explanations -->
+        <div class="panel glass score-results-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Inference & Explainability</h2>
+            <span class="badge" id="model-version-badge">xgboost-v1</span>
+          </div>
+
+          <!-- Circular Risk Gauge -->
+          <div class="gauge-container">
+            <div class="gauge-wrapper">
+              <svg class="gauge-svg" viewBox="0 0 200 200">
+                <circle class="gauge-bg" cx="100" cy="100" r="80"></circle>
+                <circle class="gauge-progress" id="gauge-circle" cx="100" cy="100" r="80"></circle>
+              </svg>
+              <div class="gauge-text">
+                <span class="gauge-value" id="gauge-score">0.0%</span>
+                <span class="gauge-label">Risk Probability</span>
+              </div>
+            </div>
+
+            <div class="decision-badge-container">
+              <div class="decision-pill clean" id="decision-pill">
+                <span class="decision-dot"></span>
+                <span id="decision-text">CLEAN TRANSACTION</span>
+              </div>
+              <div class="latency-info" id="latency-info">Threshold: 94.5% • Ready</div>
+            </div>
+          </div>
+
+          <!-- Explainable AI Section -->
+          <div class="xai-section">
+            <div class="xai-header">
+              <h3 class="xai-title">Forensic Feature Attribution</h3>
+              <span class="xai-subtitle">Local contributions pushing risk score</span>
+            </div>
+
+            <div class="xai-factors-list" id="xai-factors-list">
+              <div class="xai-empty">
+                Run a transaction scoring to view Explainable AI risk factor attributions.
+              </div>
+            </div>
+          </div>
+
+          <!-- MLOps Drift & Shadow Health Widget -->
+          <div class="model-health-panel glass">
+            <div class="panel-header" style="padding-bottom: 0.5rem;">
+              <div>
+                <h3 class="panel-title" style="font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-primary);"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+                  MLOps Concept Drift &amp; Shadow Scorer
+                </h3>
+                <span class="panel-subtitle" style="font-size: 0.75rem;">Continuous Population Stability Index (PSI) &amp; Champion vs Challenger agreement</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="refreshDriftAndShadow()" style="padding: 2px 8px; font-size: 0.75rem;">Refresh</button>
+            </div>
+            <div class="drift-metrics-grid">
+              <div class="drift-stat-card">
+                <span class="drift-stat-label">Max Feature PSI</span>
+                <div class="drift-stat-value" id="drift-psi-val">0.021</div>
+                <span class="badge badge-green" id="drift-status-badge" style="font-size: 0.68rem; align-self: flex-start;">HEALTHY</span>
+              </div>
+              <div class="drift-stat-card">
+                <span class="drift-stat-label">Model Agreement</span>
+                <div class="drift-stat-value" id="shadow-agreement-val" style="color: var(--accent-cyan);">98.6%</div>
+                <span class="text-muted" style="font-size: 0.7rem;">Decision consensus</span>
+              </div>
+              <div class="drift-stat-card">
+                <span class="drift-stat-label">Score Divergence (MAE)</span>
+                <div class="drift-stat-value" id="shadow-mae-val" style="color: var(--accent-amber);">0.018</div>
+                <span class="text-muted" style="font-size: 0.7rem;">Mean score delta</span>
+              </div>
+              <div class="drift-stat-card">
+                <span class="drift-stat-label">Shadow Latency</span>
+                <div class="drift-stat-value" id="shadow-latency-val" style="color: var(--accent-green);">0.45 ms</div>
+                <span class="text-muted" style="font-size: 0.7rem;">Non-blocking thread</span>
+              </div>
+            </div>
+            <div class="monitored-features-row" id="monitored-features-pills">
+              <span class="feature-drift-pill"><span>Amount:</span> <strong>0.019 (Stable)</strong></span>
+              <span class="feature-drift-pill"><span>V14:</span> <strong>0.021 (Stable)</strong></span>
+              <span class="feature-drift-pill"><span>V10:</span> <strong>0.015 (Stable)</strong></span>
+              <span class="feature-drift-pill"><span>V4:</span> <strong>0.012 (Stable)</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: INVESTIGATION COPILOT (RAG) -->
+    <section class="tab-pane" id="pane-copilot" role="tabpanel">
+      <div class="copilot-layout">
+        <!-- Chat Area -->
+        <div class="panel glass chat-panel">
+          <div class="panel-header chat-header">
+            <div class="copilot-identity">
+              <div class="copilot-avatar">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2m0 5v4m0 4h.01"/></svg>
+              </div>
+              <div>
+                <h2 class="panel-title">Investigation Copilot</h2>
+                <p class="panel-subtitle">Natural language retrieval over 200 flagged fraud cases with grounded citations</p>
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="clearChat()">Clear Chat</button>
+          </div>
+
+          <!-- Suggestions ribbon -->
+          <div class="quick-prompts">
+            <span class="prompts-label">Suggested Queries:</span>
+            <button class="prompt-chip" onclick="applyPrompt('Which accounts have risk scores above 80%?')">
+              High-Risk Accounts (>80%)
+            </button>
+            <button class="prompt-chip" onclick="applyPrompt('What cases involve mule account networks?')">
+              Mule Account Networks
+            </button>
+            <button class="prompt-chip" onclick="applyPrompt('Find unauthorized ATM withdrawals flagged in Mumbai')">
+              ATM Geolocation Anomalies
+            </button>
+            <button class="prompt-chip" onclick="applyPrompt('Show cases with FIR under Section 420 IPC')">
+              Section 420 IPC Cases
+            </button>
+          </div>
+
+          <!-- Chat messages feed -->
+          <div class="chat-messages" id="chat-messages">
+            <!-- Welcome message -->
+            <div class="chat-msg assistant">
+              <div class="msg-avatar">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <div class="msg-bubble">
+                <p>Hello Investigator. I am your <strong>Fraud Investigation Copilot</strong>. I have indexed <strong>200 synthetic fraud investigation records</strong> into ChromaDB.</p>
+                <p>You can ask me questions regarding account holders, flagged UPI IDs, suspicious merchants, mule networks, or high-risk transaction patterns.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input Bar -->
+          <form class="chat-input-bar" onsubmit="handleAskSubmit(event)">
+            <input type="text" id="chat-input" placeholder="Ask a question about flagged cases or accounts (e.g. Which UPI IDs are linked to mule accounts?)..." required autocomplete="off" />
+            <div class="chat-actions">
+              <div class="top-k-select">
+                <label for="top-k-input">Retrieve</label>
+                <select id="top-k-input">
+                  <option value="3">Top 3</option>
+                  <option value="5" selected>Top 5</option>
+                  <option value="10">Top 10</option>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary" id="ask-btn">
+                <span>Ask</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: CASE EXPLORER -->
+    <section class="tab-pane" id="pane-cases" role="tabpanel">
+      <div class="panel glass">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Flagged Case Explorer</h2>
+            <p class="panel-subtitle">Browse, search, and inspect the synthetic fraud case repository</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="loadCases()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            Refresh
+          </button>
+        </div>
+
+        <!-- Filter Toolbar -->
+        <div class="filter-toolbar">
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="case-search-input" placeholder="Search by Case ID, Account, UPI ID, or Name..." oninput="debounceCaseSearch()" />
+          </div>
+
+          <div class="filter-pills">
+            <button class="filter-pill active" onclick="setCaseStatusFilter('all', this)">All</button>
+            <button class="filter-pill" onclick="setCaseStatusFilter('escalated', this)">Escalated</button>
+            <button class="filter-pill" onclick="setCaseStatusFilter('open', this)">Open</button>
+            <button class="filter-pill" onclick="setCaseStatusFilter('under_review', this)">Under Review</button>
+            <button class="filter-pill" onclick="setCaseStatusFilter('resolved', this)">Resolved</button>
+          </div>
+        </div>
+
+        <!-- Cases Table -->
+        <div class="table-responsive">
+          <table class="cases-table">
+            <thead>
+              <tr>
+                <th>Case ID</th>
+                <th>Account Holder</th>
+                <th>UPI ID</th>
+                <th>Amount</th>
+                <th>Risk Score</th>
+                <th>Status</th>
+                <th>Timestamp</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="cases-table-body">
+              <tr>
+                <td colspan="8" class="text-center py-4">Loading cases...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Table Pagination -->
+        <div class="pagination-bar">
+          <span class="page-info" id="page-info">Showing 1-20 of 200 cases</span>
+          <div class="page-buttons">
+            <button class="btn btn-secondary btn-sm" id="btn-prev-page" onclick="changePage(-1)" disabled>Previous</button>
+            <span class="current-page-num" id="current-page-num">1</span>
+            <button class="btn btn-secondary btn-sm" id="btn-next-page" onclick="changePage(1)">Next</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Case Details Modal -->
+  <div class="modal-overlay" id="case-modal" onclick="closeModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div class="modal-badge-row">
+            <span class="badge badge-purple" id="modal-case-id">CASE-XXXX</span>
+            <span class="badge" id="modal-status-badge">OPEN</span>
+            <span class="badge" id="modal-risk-badge">RISK: 0.95</span>
+          </div>
+          <h2 class="modal-title" id="modal-holder-name">Account Holder Name</h2>
+        </div>
+        <button class="modal-close-btn" onclick="closeCaseModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Account details grid -->
+        <div class="meta-grid">
+          <div class="meta-item">
+            <span class="meta-label">Account Number</span>
+            <span class="meta-val mono" id="modal-account-num">--</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">UPI ID</span>
+            <span class="meta-val mono" id="modal-upi-id">--</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Transaction Amount</span>
+            <span class="meta-val text-bold" id="modal-amount">₹0.00</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Assigned Investigator</span>
+            <span class="meta-val" id="modal-assigned">INV-101</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Phone & Email</span>
+            <span class="meta-val" id="modal-contact">--</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Address</span>
+            <span class="meta-val" id="modal-address">--</span>
+          </div>
+        </div>
+
+        <!-- Complaint Text -->
+        <div class="narrative-box">
+          <h4 class="narrative-title">Customer Incident Report / Alert</h4>
+          <p class="narrative-text" id="modal-complaint">--</p>
+        </div>
+
+        <!-- Investigator Notes -->
+        <div class="narrative-box notes">
+          <h4 class="narrative-title">Investigator Forensic Notes</h4>
+          <p class="narrative-text" id="modal-notes">--</p>
+        </div>
+
+        <!-- Case Actions & Status Transition -->
+        <div class="workflow-actions-box">
+          <div class="workflow-actions-header">
+            <h4 class="narrative-title" style="margin-bottom: 0;">Case Workflow Actions</h4>
+            <span class="workflow-status-label">Current: <strong id="modal-current-status">OPEN</strong></span>
+          </div>
+          <div class="workflow-btn-group">
+            <button class="btn btn-sm btn-outline-warning" id="btn-status-review" onclick="updateCurrentCaseStatus('under_review')">Mark Under Review</button>
+            <button class="btn btn-sm btn-outline-danger" id="btn-status-escalate" onclick="updateCurrentCaseStatus('escalated')">Escalate to L2</button>
+            <button class="btn btn-sm btn-outline-success" id="btn-status-resolve" onclick="updateCurrentCaseStatus('resolved')">Mark Resolved</button>
+          </div>
+        </div>
+
+        <!-- Add Investigator Note -->
+        <div class="add-note-box">
+          <label for="new-note-input" class="narrative-title" style="display:block; margin-bottom: 6px;">Append Forensic Note</label>
+          <div class="note-input-row">
+            <input type="text" id="new-note-input" class="note-text-input" placeholder="Enter findings, customer callback status, police report #..." maxlength="1000" />
+            <button class="btn btn-primary btn-sm" id="save-note-btn" onclick="submitCaseNote()">Save Note</button>
+          </div>
+        </div>
+
+        <!-- Linked Mule Network -->
+        <div class="linked-network-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <h4 class="narrative-title" style="margin: 0;">Linked Entities (Network Topology)</h4>
+            <button class="btn btn-sm btn-outline-primary" onclick="openNetworkGraphModal(state.activeCaseModalId)" style="font-size: 0.75rem; padding: 4px 10px;">
+              Inspect Mule Network Graph
+            </button>
+          </div>
+          <div class="linked-tags" id="modal-linked-accounts">
+            <span class="linked-tag">No linked accounts</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="flex-wrap: wrap; gap: 8px;">
+        <button class="btn btn-outline-danger btn-sm" id="btn-export-sar-xml" onclick="exportFinCENSar(state.activeCaseModalId, 'xml')" title="Download standardized FinCEN XML regulatory report">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          FinCEN SAR (XML)
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="btn-export-sar-json" onclick="exportFinCENSar(state.activeCaseModalId, 'json')" title="Download SAR Audit Dossier in JSON">
+          SAR Dossier (JSON)
+        </button>
+        <button class="btn btn-outline-primary btn-sm" id="btn-export-case" onclick="exportCurrentCase()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Case Export
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="askAboutCurrentCase()">Ask Copilot</button>
+        <button class="btn btn-primary btn-sm" onclick="closeCaseModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BATCH SCORING SIMULATOR MODAL -->
+  <div class="modal-backdrop" id="batch-modal" role="dialog" aria-modal="true" aria-labelledby="batch-modal-title" style="display: none;">
+    <div class="modal-card glass" style="max-width: 860px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="batch-modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-primary);"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            High-Throughput Batch Scoring Simulator
+          </h3>
+          <span class="text-muted" style="font-size: 0.8rem;">Evaluate parallel vector inference via <code>POST /score/batch</code></span>
+        </div>
+        <button class="modal-close" onclick="closeBatchModal()" aria-label="Close batch modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1.25rem;">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Batch Size Presets:</span>
+            <button class="preset-chip" onclick="runBatchScoreDemo(5)">5 Txns</button>
+            <button class="preset-chip" onclick="runBatchScoreDemo(20)">20 Txns</button>
+            <button class="preset-chip" onclick="runBatchScoreDemo(50)">50 Txns</button>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-run-batch" onclick="runBatchScoreDemo(20)" style="display: flex; align-items: center; gap: 6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Run Synthetic Batch
+          </button>
+        </div>
+
+        <!-- Batch Metrics Summary Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
+          <div class="metric-card" style="padding: 12px 16px;">
+            <div>
+              <div class="metric-value" id="batch-stat-total" style="font-size: 1.35rem;">0</div>
+              <div class="metric-title">Transactions Scored</div>
+            </div>
+          </div>
+          <div class="metric-card" style="padding: 12px 16px;">
+            <div>
+              <div class="metric-value" id="batch-stat-flagged" style="font-size: 1.35rem; color: var(--accent-red);">0</div>
+              <div class="metric-title">High Risk Flagged</div>
+            </div>
+          </div>
+          <div class="metric-card" style="padding: 12px 16px;">
+            <div>
+              <div class="metric-value" id="batch-stat-latency" style="font-size: 1.35rem; color: var(--accent-cyan);">-- ms</div>
+              <div class="metric-title">Batch Latency</div>
+            </div>
+          </div>
+          <div class="metric-card" style="padding: 12px 16px;">
+            <div>
+              <div class="metric-value" id="batch-stat-avg-score" style="font-size: 1.35rem; color: var(--accent-amber);">--</div>
+              <div class="metric-title">Mean Risk Score</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Batch Results Table -->
+        <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+          <table class="cases-table" id="batch-results-table">
+            <thead>
+              <tr>
+                <th>Txn ID</th>
+                <th>Amount</th>
+                <th>Category</th>
+                <th>Velocity</th>
+                <th>Risk Score</th>
+                <th>Decision</th>
+              </tr>
+            </thead>
+            <tbody id="batch-results-body">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+                  Select a preset above and click "Run Synthetic Batch" to simulate vectorized inference.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeBatchModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MULE RING NETWORK GRAPH MODAL -->
+  <div class="modal-backdrop" id="network-modal" role="dialog" aria-modal="true" style="display: none;">
+    <div class="modal-card glass" style="max-width: 960px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-violet);"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Mule Ring Network &amp; Entity Resolution Graph
+          </h3>
+          <span class="text-muted" style="font-size: 0.8rem;" id="network-case-subtitle">Ego-network subgraph analysis</span>
+        </div>
+        <button class="modal-close" onclick="closeNetworkModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="network-alerts-banner" style="display: none; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 1rem; background: var(--accent-red-subtle); border: 1px solid #fecaca; color: #991b1b; font-size: 0.82rem;"></div>
+        <div class="graph-canvas-container">
+          <canvas id="network-canvas" width="900" height="420"></canvas>
+          <div class="graph-legend">
+            <span class="legend-item"><span class="legend-dot case-dot"></span> Case</span>
+            <span class="legend-item"><span class="legend-dot acc-dot"></span> Account</span>
+            <span class="legend-item"><span class="legend-dot upi-dot"></span> UPI</span>
+            <span class="legend-item"><span class="legend-dot dev-dot"></span> Device</span>
+            <span class="legend-item"><span class="legend-dot ip-dot"></span> IP</span>
+          </div>
+        </div>
+        <div class="network-metrics-row" id="network-metrics-row" style="margin-top: 1rem; display: flex; gap: 15px; flex-wrap: wrap;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeNetworkModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

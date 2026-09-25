@@ -36,6 +36,7 @@ data/*.db-wal
 models/*.joblib
 models/*.pkl
 !models/.gitkeep
+!models/xgboost_fraud_v1.joblib
 
 # IDE & Editor files
 .vscode/

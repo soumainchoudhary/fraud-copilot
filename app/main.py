@@ -94,8 +94,11 @@ async def lifespan(app: FastAPI):
     if chroma_dir.exists():
         logger.info("chroma_ready", path=str(chroma_dir))
     else:
-        logger.warning("chroma_not_found", path=str(chroma_dir),
-                       hint="Run 'python -m app.rag.ingest' to index case records")
+        logger.warning(
+            "chroma_not_found",
+            path=str(chroma_dir),
+            hint="Run 'python -m app.rag.ingest' to index case records",
+        )
 
     yield
 
